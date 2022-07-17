@@ -1,14 +1,15 @@
+// ### load packages
 require('dotenv').config();
 const tmi = require('tmi.js');
+const axios = require('axios').default;
 
+
+// ### define vars
 const regexpCommand = new RegExp(/^!([a-zA-Z0-9]+)(?:\W+)?(.*)?/);
+const api_path = "https://rebrickable.com/api/v3/lego/";
 
-const commands = {
-    set: {
-        response: (set) => `The ${set} set looks cool!!`
-    }
-}
 
+// ### define twitch client
 const client = new tmi.Client({
     connection: {
         reconnect: true
@@ -22,17 +23,26 @@ const client = new tmi.Client({
 
 client.connect();
 
+
+// ### listen to twitch chat
 client.on('message', (channel, tags, message, self) => {
     if(message[0] === "!" && !(self)) {
 
         const [raw, command, arg] = message.match(regexpCommand);
-        const {response} = commands[command] || {};
 
-        if(typeof response === 'function') {
-            client.say(channel, response(arg));
-        }
-        else if(typeof response === 'string') {
-            client.say(channel, response);
+        if(command === "set") {
+            axios.get(api_path + '/sets/' + arg + '-1', {
+                params: { key: process.env.REBRICKABLE_API_KEY }
+            })
+            .then(function (r) {
+                if(r.status === 200) {
+                    let set = r.data;
+                    client.say(channel, `${set.name} [${arg}] was released in ${set.year} and has ${set.num_parts} parts! ${set.set_url}`);
+                }
+            })
+            .catch(function (error) {
+                client.say(channel, `Sorry, no set ${arg} was found :(`);
+            });
         }
     }
 });
